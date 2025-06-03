@@ -3,6 +3,8 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Api\CategoryController;
+use App\Http\Controllers\Api\ProductController;
 
 Route::get('/test', function () {
     return response()->json(['message' => 'API is working!']);
@@ -13,7 +15,7 @@ Route::get('/test', function () {
 
 Route::post('/register', [AuthController::class, 'register']);
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
 
 
 
@@ -37,5 +39,12 @@ Route::middleware(['auth:sanctum', 'admin'])->group(function () {
         return response()->json(['message' => 'Welcome to the admin dashboard!']);
     });
 
+    // Category Management Routes (Admin Only)
+    Route::apiResource('categories', CategoryController::class);
+
+    // Product Management Routes (Admin Only)
+    Route::apiResource('products', ProductController::class);
+
     // Add more admin-specific routes as needed
+    
 });
