@@ -66,4 +66,19 @@ class CustomerFactory extends Factory
             ];
         });
     }
+    /**
+     * Indicate that the customer is an individual bulk purchaser.
+     * This customer type also does not require business_name or tax_id.
+     */
+    public function individualBulk(): Factory
+    {
+        return $this->state(function (array $attributes) {
+            return [
+                'customer_type' => 'individual_bulk',
+                'business_name' => null,
+                'tax_id' => null,
+            ];
+        });
+    }
+    
 }

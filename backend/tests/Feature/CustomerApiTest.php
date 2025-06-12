@@ -22,6 +22,7 @@ class CustomerApiTest extends TestCase
      */
     protected function createAuthenticatedUser(): User
     {
+        /** @var \App\Models\User $user */
         // Create a new user using the User factory. Factories provide dummy data.
         $user = User::factory()->create();
 
@@ -30,6 +31,16 @@ class CustomerApiTest extends TestCase
         $this->actingAs($user, 'sanctum');
 
         return $user;
+    }
+
+    protected function createAuthenticatedAdminUser(): User
+    {
+        /** @var \App\Models\User $admin */
+        // Creates a user with the 'admin' role (using the 'admin' state from UserFactory).
+        $admin = User::factory()->admin()->create();
+        // Simulates logging in as this admin user using the 'sanctum' guard.
+        $this->actingAs($admin, 'sanctum');
+        return $admin;
     }
 
     /*
@@ -76,7 +87,6 @@ class CustomerApiTest extends TestCase
                     'digital_address' => 'East Legon, Near Boundary Road',
                     'contact_person_name' => 'Adwoa Mensah',
                     'contact_person_phone' => '+233241234567',
-                    'id' => $customerData['user_id'],
                 ]
             ]);
 
@@ -136,7 +146,6 @@ class CustomerApiTest extends TestCase
                     'user_id' => $user->id,
                     'customer_type' => 'restaurant',
                     'tax_id' => 'C0098765432',
-                    'id' => $customerData['user_id'],
                 ]
             ]);
             // Verify the JSON structure includes dynamic fields like timestamps.
@@ -191,7 +200,6 @@ class CustomerApiTest extends TestCase
                     'user_id' => $user->id,
                     'customer_type' => 'restaurant',
                     'tax_id' => 'GHA-12345678-A',
-                    'id' => $customerData['user_id'],
                 ]
             ]);
         // Verify the JSON structure includes dynamic fields like timestamps.
@@ -910,32 +918,33 @@ class CustomerApiTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /*
+     /*
     |--------------------------------------------------------------------------
-    | CUSTOMER PROFILE RETRIEVAL TESTS (HTTP Status: 200 OK / 401 Unauthorized / 403 Forbidden / 404 Not Found)
+    | CUSTOMER PROFILE RETRIEVAL (SINGLE) TESTS (HTTP Status: 200 OK / 401 Unauthorized / 403 Forbidden / 404 Not Found)
+    |   -- HYBRID ACCESS (OWNER or ADMIN) --
     |--------------------------------------------------------------------------
     */
 
     /**
-     * Test that an authenticated user can retrieve their own customer profile.
+     * Test that an authenticated REGULAR user CAN retrieve their OWN customer profile by ID.
      */
-    public function test_authenticated_user_can_retrieve_their_own_customer_profile()
+    public function test_regular_user_can_retrieve_their_own_customer_profile()
     {
-        // 1. Arrange: Create a user and their customer profile.
+        // Arrange: Create a user and their customer profile.
         $user = $this->createAuthenticatedUser();
         $customer = Customer::factory()->family()->create([
             'user_id' => $user->id,
-            'ghanapost_gps_address' => 'AB-111-2222', // Specific data to assert
+            'ghanapost_gps_address' => 'AB-111-2222',
+            'digital_address' => 'Agbogbloshie Market', // Assuming digital_address is not set in the factory
             'contact_person_name' => 'John Doe',
+            'contact_person_phone' => '+233241234567',
         ]);
 
-        // 2. Act: Send a GET request to retrieve this customer profile.
+        // Act: Send a GET request to retrieve this customer profile.
         $response = $this->getJson("/api/customers/{$customer->id}");
 
-        // 3. Assert:
-        // Expect a 200 OK status.
+        // Assert: Expect 200 OK and the customer's data.
         $response->assertStatus(200)
-            // Assert that the JSON response contains the success message and specific customer data.
             ->assertJson([
                 'message' => 'Customer profile retrieved successfully',
                 'customer' => [
@@ -943,14 +952,14 @@ class CustomerApiTest extends TestCase
                     'user_id' => $user->id,
                     'customer_type' => 'family',
                     'ghanapost_gps_address' => 'AB-111-2222',
+                    'digital_address' => $customer->digital_address, // Assuming digital_address is not se
                     'contact_person_name' => 'John Doe',
-                    // business_name and tax_id should be null for family, and might be omitted by default Eloquent serialization
-                    // Ensure you check the JSON structure if they are always included as null
+                    'contact_person_phone' => $customer->contact_person_phone,
                     'business_name' => null,
                     'tax_id' => null,
                 ]
             ])
-            ->assertJsonStructure([ // Verify the full JSON structure including dynamic fields
+            ->assertJsonStructure([
                 'message',
                 'customer' => [
                     'id', 'user_id', 'customer_type', 'business_name', 'tax_id',
@@ -961,52 +970,404 @@ class CustomerApiTest extends TestCase
     }
 
     /**
-     * Test that an authenticated user cannot retrieve another user's customer profile.
+     * Test that an authenticated REGULAR user CANNOT retrieve another user's customer profile.
+     * This test now expects a 403 Forbidden.
      */
-    public function test_authenticated_user_cannot_retrieve_another_users_customer_profile()
+    public function test_regular_user_cannot_retrieve_another_users_customer_profile()
     {
-        // Arrange: Create User A (authenticated) and their customer profile.
+        // Arrange: Create User A (authenticated regular user) and their customer profile.
         $userA = $this->createAuthenticatedUser();
-        $customerA = Customer::factory()->family()->create(['user_id' => $userA->id]);
+        Customer::factory()->family()->create(['user_id' => $userA->id]); // Customer for User A
 
-        // Create User B and their customer profile (not authenticated for this request).
+        // Create User B and their customer profile.
         $userB = User::factory()->create();
-        $customerB = Customer::factory()->family()->create(['user_id' => $userB->id]);
+        $customerB = Customer::factory()->family()->create(['user_id' => $userB->id]); // Customer for User B
 
         // Act: Authenticated User A tries to retrieve Customer B's profile.
         $response = $this->getJson("/api/customers/{$customerB->id}");
 
-        // Assert: Expect 403 Forbidden due to authorization policy in UpdateCustomerRequest's authorize method.
-        // The same authorize logic (or policy) should apply for SHOW.
+        // Assert: Expect 403 Forbidden.
         $response->assertStatus(403);
     }
 
     /**
-     * Test that an unauthenticated user cannot retrieve any customer profile.
+     * Test that an ADMIN user CAN retrieve ANY customer profile by ID.
      */
-    public function test_unauthenticated_user_cannot_retrieve_customer_profile()
+    public function test_admin_can_retrieve_any_customer_profile_by_id()
     {
-        // Arrange: Create a customer profile (owner doesn't matter for this test).
+        // Arrange: Create an admin user.
+        $admin = $this->createAuthenticatedAdminUser();
+
+        // Create a regular user and their customer profile.
+        $user = User::factory()->create();
+        $customer = Customer::factory()->restaurant()->create([ // Use restaurant for different data
+            'user_id' => $user->id,
+            'business_name' => 'Admin View Test Co.',
+            'tax_id' => 'V0011223344',
+            'ghanapost_gps_address' => 'GT-123-4567',
+            'digital_address' => 'Digital Address Example',
+            'contact_person_name' => 'Admin Contact',
+            'contact_person_phone' => '+233501234567',
+        ]);
+
+        // Act: Admin user tries to retrieve the customer profile.
+        $response = $this->getJson("/api/customers/{$customer->id}");
+
+        // Assert: Expect 200 OK and the customer's data.
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Customer profile retrieved successfully',
+                'customer' => [
+                    'id' => $customer->id,
+                    'user_id' => $user->id,
+                    'customer_type' => 'restaurant',
+                    'business_name' => 'Admin View Test Co.',
+                    'ghanapost_gps_address' => $customer->ghanapost_gps_address,
+                    'digital_address' => $customer->digital_address,
+                    'tax_id' => 'V0011223344',
+                    'contact_person_name' => $customer->contact_person_name,
+                    'contact_person_phone' => $customer->contact_person_phone,
+                ]
+            ])
+            ->assertJsonStructure([
+                'message',
+                'customer' => [
+                    'id', 'user_id', 'customer_type', 'business_name', 'tax_id',
+                    'ghanapost_gps_address', 'digital_address', 'contact_person_name',
+                    'contact_person_phone', 'created_at', 'updated_at',
+                ]
+            ]);
+    }
+
+    /**
+     * Test that an unauthenticated user cannot retrieve any customer profile by ID.
+     */
+    public function test_unauthenticated_user_cannot_retrieve_customer_profile_by_id()
+    {
+        // Arrange: Create a customer profile.
         $customer = Customer::factory()->create();
 
         // Act: Attempt to retrieve without being authenticated.
         $response = $this->getJson("/api/customers/{$customer->id}");
 
-        // Assert: Expect 401 Unauthorized (due to 'auth:sanctum' middleware).
+        // Assert: Expect 401 Unauthorized.
         $response->assertStatus(401);
     }
 
     /**
      * Test that retrieving a non-existent customer profile returns a 404 Not Found.
+     * This applies to both regular and admin users as Route Model Binding handles it.
      */
     public function test_retrieving_non_existent_customer_profile_returns_404()
     {
-        // Arrange: Authenticate a user.
-        $this->createAuthenticatedUser();
+        // Arrange: Authenticate a user (doesn't matter if regular or admin, 404 comes first).
+        $this->createAuthenticatedUser(); // Can use createAuthenticatedAdminUser too if you want to test admin 404.
 
         // Act: Attempt to retrieve a customer with a non-existent ID.
-        $nonExistentId = 99999; // Assume this ID does not exist
+        $nonExistentId = 99999;
         $response = $this->getJson("/api/customers/{$nonExistentId}");
+
+        // Assert: Expect 404 Not Found (due to Route Model Binding).
+        $response->assertStatus(404);
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CUSTOMER PROFILE LIST RETRIEVAL TESTS (HTTP Status: 200 OK / 401 Unauthorized / 403 Forbidden)
+    |   -- HYBRID ACCESS (OWNER or ADMIN) --
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Test that an authenticated REGULAR user can retrieve their OWN customer profile in the list.
+     * They should NOT see other users' profiles.
+     */
+    public function test_regular_user_gets_only_their_customer_profile_in_list()
+    {
+        // Arrange: Create a user and their customer profile.
+        $user = $this->createAuthenticatedUser();
+        $customer = Customer::factory()->family()->create([
+            'user_id' => $user->id,
+            'ghanapost_gps_address' => 'AB-111-LIST',
+            'contact_person_name' => 'List User',
+        ]);
+
+        // Create other customers for other users (should NOT be returned for the authenticated user).
+        Customer::factory()->count(2)->create();
+
+        // Act: Send a GET request to the list endpoint.
+        $response = $this->getJson('/api/customers');
+
+        // Assert:
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'Your customer profile retrieved successfully', // Check for the regular user's success message
+                'customers' => [
+                    // Only the authenticated user's customer profile should be in the list.
+                    [
+                        'id' => $customer->id,
+                        'user_id' => $user->id,
+                        'customer_type' => 'family',
+                        'ghanapost_gps_address' => 'AB-111-LIST',
+                        'contact_person_name' => 'List User',
+                        'business_name' => null,
+                        'tax_id' => null,
+                    ]
+                ]
+            ])
+            ->assertJsonStructure([
+                'message',
+                'customers' => [
+                    '*' => [ // '*' means any item in the array
+                        'id', 'user_id', 'customer_type', 'business_name', 'tax_id',
+                        'ghanapost_gps_address', 'digital_address', 'contact_person_name',
+                        'contact_person_phone', 'created_at', 'updated_at',
+                    ]
+                ]
+            ]);
+
+        // Also assert that the count of customers returned is exactly 1 (for the current user).
+        $this->assertCount(1, $response->json('customers'));
+    }
+
+    /**
+     * Test that an authenticated REGULAR user without a customer profile gets an empty list.
+     */
+    public function test_regular_user_without_customer_profile_gets_empty_list()
+    {
+        // Arrange: Create an authenticated user but NO customer profile for them.
+        $this->createAuthenticatedUser();
+
+        // Create some other customers for other users (should NOT be returned).
+        Customer::factory()->count(3)->create();
+
+        // Act: Send a GET request to the list endpoint.
+        $response = $this->getJson('/api/customers');
+
+        // Assert:
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'No customer profile found for the authenticated user',
+                'customers' => [] // Expect an empty array
+            ])
+            ->assertJsonStructure([
+                'message',
+                'customers', // Ensure 'customers' key exists, even if array is empty
+            ]);
+
+        // Assert that the count of customers returned is exactly 0.
+        $this->assertCount(0, $response->json('customers'));
+    }
+
+    /**
+     * Test that an ADMIN user can retrieve a list of all customer profiles.
+     */
+    public function test_admin_can_retrieve_all_customer_profiles_list()
+    {
+         /** @var \App\Models\User $admin */
+        // Arrange: Create an admin user.
+        $admin = $this->createAuthenticatedAdminUser();
+
+        // Create several customer profiles for different users.
+        /** @var \App\Models\Customer $customer1 */
+        $customer1 = Customer::factory()->family()->create(['user_id' => User::factory()->create()->id]);
+        /** @var \App\Models\Customer $customer2 */
+        $customer2 = Customer::factory()->restaurant()->create(['user_id' => User::factory()->create()->id]);
+        /** @var \App\Models\Customer $customer3 */
+        $customer3 = Customer::factory()->individualBulk()->create(['user_id' => User::factory()->create()->id]);
+
+
+        // Act: Send a GET request to the list endpoint.
+        $response = $this->getJson('/api/customers');
+
+        // Assert:
+        $response->assertStatus(200)
+            ->assertJson([
+                'message' => 'All customer profiles retrieved successfully',
+                'customers' => [
+                    'current_page' => 1, // Assuming default pagination
+                    'data' => [
+                        // Verify the presence of expected customer IDs
+                        ['id' => $customer1->id],
+                        ['id' => $customer2->id],
+                        ['id' => $customer3->id],
+                    ],
+                    'per_page' => 15, // Default per_page value
+                    'total' => 3,
+                ]
+            ]) 
+            ->assertJsonStructure([
+                'message',
+                'customers' => [
+                    'current_page',
+                    'data' => [
+                        '*' => [
+                            'id', 'user_id', 'customer_type', 'business_name', 'tax_id',
+                            'ghanapost_gps_address', 'digital_address', 'contact_person_name',
+                            'contact_person_phone', 'created_at', 'updated_at',
+                    ]
+                        ],
+                        'first_page_url',
+                        'from',
+                        'last_page',
+                        'last_page_url',
+                        'links',
+                        'next_page_url',
+                        'path',
+                        'per_page',
+                        'prev_page_url',
+                        'to',
+                        'total',
+                    ]
+            ]);
+
+        $this->assertCount(3, $response->json('customers.data')); // Should return all 3 created customers
+    }
+
+    /**
+     * Test that an unauthenticated user cannot retrieve the customer list.
+     */
+    public function test_unauthenticated_user_cannot_retrieve_customer_list()
+    {
+        // Arrange: Create some customer profiles.
+        Customer::factory()->count(2)->create();
+
+        // Act: Attempt to retrieve the list without being authenticated.
+        $response = $this->getJson('/api/customers');
+
+        // Assert: Expect 401 Unauthorized (due to 'auth:sanctum' middleware).
+        $response->assertStatus(401);
+    }
+
+ /*
+    |--------------------------------------------------------------------------
+    | CUSTOMER PROFILE DELETION TESTS (HTTP Status: 200 OK / 401 Unauthorized / 403 Forbidden / 404 Not Found)
+    |   -- HYBRID ACCESS (OWNER or ADMIN) --
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * Test that an authenticated REGULAR user can delete their OWN customer profile.
+     */
+    public function test_regular_user_can_delete_their_own_customer_profile()
+    {
+        // Arrange: Create a user and their customer profile.
+        /** @var \App\Models\User $user */
+        $user = $this->createAuthenticatedUser();
+        /** @var \App\Models\Customer $customer */
+        $customer = Customer::factory()->family()->create(['user_id' => $user->id]);
+
+        // Assert that the customer exists in the database initially.
+        $this->assertDatabaseHas('customers', ['id' => $customer->id]);
+
+        // Act: Send a DELETE request to delete this customer profile.
+        $response = $this->deleteJson("/api/customers/{$customer->id}");
+
+        // Assert:
+        $response->assertStatus(200) // Expect 200 OK (with message) or 204 No Content if chosen.
+                 ->assertJson([
+                     'message' => 'Customer profile deleted successfully.'
+                 ]);
+
+        // Assert that the customer record is no longer in the database.
+        $this->assertDatabaseMissing('customers', ['id' => $customer->id]);
+    }
+
+    /**
+     * Test that an authenticated REGULAR user CANNOT delete another user's customer profile.
+     */
+    public function test_regular_user_cannot_delete_another_users_customer_profile()
+    {
+        // Arrange: Create User A (authenticated regular user) and their customer profile.
+        /** @var \App\Models\User $userA */
+        $userA = $this->createAuthenticatedUser();
+        Customer::factory()->family()->create(['user_id' => $userA->id]); // Customer for User A
+
+        // Create User B and their customer profile.
+        /** @var \App\Models\User $userB */
+        $userB = User::factory()->create();
+        /** @var \App\Models\Customer $customerB */
+        $customerB = Customer::factory()->family()->create(['user_id' => $userB->id]);
+
+        // Assert that Customer B exists initially.
+        $this->assertDatabaseHas('customers', ['id' => $customerB->id]);
+
+        // Act: Authenticated User A tries to delete Customer B's profile.
+        $response = $this->deleteJson("/api/customers/{$customerB->id}");
+
+        // Assert: Expect 403 Forbidden.
+        $response->assertStatus(403);
+
+        // Assert that Customer B's profile still exists in the database (was NOT deleted).
+        $this->assertDatabaseHas('customers', ['id' => $customerB->id]);
+    }
+
+    /**
+     * Test that an ADMIN user CAN delete ANY customer profile.
+     */
+    public function test_admin_can_delete_any_customer_profile()
+    {
+        // Arrange: Create an admin user.
+        /** @var \App\Models\User $admin */
+        $admin = $this->createAuthenticatedAdminUser();
+
+        // Create a regular user and their customer profile (that the admin will delete).
+        /** @var \App\Models\User $user */
+        $user = User::factory()->create();
+        /** @var \App\Models\Customer $customer */
+        $customer = Customer::factory()->restaurant()->create(['user_id' => $user->id]);
+
+        // Assert that the customer exists in the database initially.
+        $this->assertDatabaseHas('customers', ['id' => $customer->id]);
+
+        // Act: Admin user tries to delete the customer profile.
+        $response = $this->deleteJson("/api/customers/{$customer->id}");
+
+        // Assert:
+        $response->assertStatus(200) // Expect 200 OK (with message) or 204 No Content.
+                 ->assertJson([
+                     'message' => 'Customer profile deleted successfully.'
+                 ]);
+
+        // Assert that the customer record is no longer in the database.
+        $this->assertDatabaseMissing('customers', ['id' => $customer->id]);
+    }
+
+    /**
+     * Test that an unauthenticated user cannot delete any customer profile.
+     */
+    public function test_unauthenticated_user_cannot_delete_customer_profile()
+    {
+        // Arrange: Create a customer profile.
+        /** @var \App\Models\Customer $customer */
+        $customer = Customer::factory()->create();
+
+        // Assert that the customer exists initially.
+        $this->assertDatabaseHas('customers', ['id' => $customer->id]);
+
+        // Act: Attempt to delete without being authenticated.
+        $response = $this->deleteJson("/api/customers/{$customer->id}");
+
+        // Assert: Expect 401 Unauthorized.
+        $response->assertStatus(401);
+
+        // Assert that the customer record still exists (was NOT deleted).
+        $this->assertDatabaseHas('customers', ['id' => $customer->id]);
+    }
+
+    /**
+     * Test that deleting a non-existent customer profile returns a 404 Not Found.
+     * This applies to both regular and admin users as Route Model Binding handles it.
+     */
+    public function test_deleting_non_existent_customer_profile_returns_404()
+    {
+        // Arrange: Authenticate a user (regular or admin, 404 comes first).
+        $this->createAuthenticatedUser();
+
+        // Act: Attempt to delete a customer with a non-existent ID.
+        $nonExistentId = 99999;
+        $response = $this->deleteJson("/api/customers/{$nonExistentId}");
 
         // Assert: Expect 404 Not Found (due to Route Model Binding).
         $response->assertStatus(404);

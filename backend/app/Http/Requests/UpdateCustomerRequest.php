@@ -96,18 +96,17 @@ class UpdateCustomerRequest extends FormRequest
                 },
             ],
             'contact_person_name' => [
-                'sometimes', // Field is optional for update.
-                'nullable',  // Can be null.
+                'sometimes',
+                'nullable',
                 'string',
                 'max:255',
             ],
             'contact_person_phone' => [
-                'sometimes', // Field is optional for update.
-                'nullable',  // Can be null.
+                'sometimes',
+                'nullable',
                 'string',
                 'max:255',
-                // Regex for Ghanaian phone numbers (e.g., +233241234567 or 0241234567)
-                'regex:/^(\+233|0)[2|5]\d{8}$/'
+                'regex:/^\+\d{7,15}$/'
             ],
         ];
     }

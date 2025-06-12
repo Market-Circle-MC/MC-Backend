@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use App\Models\Customer;
 use App\Http\Requests\StoreCustomerRequest;
 use App\Http\Requests\UpdateCustomerRequest;
@@ -13,10 +14,39 @@ class CustomerController extends Controller
 {
     /**
      * Display a listing of the resource.
+     *  Authenticated User: Returns their own customer profile (if exists).
+     * Admin User: Returns a list of ALL customer profiles.
+     *
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        $user = Auth::user();
+        if ($user && $user->role === 'admin') {
+            // Admin user: return all customer profiles
+            $customers = Customer::paginate(15);
+            return response()->json([
+                'message' => 'All customer profiles retrieved successfully',
+                'customers' => $customers
+            ], 200);
+        } else {
+            // Regular user can only see their own profile.
+            $customer = $user->customer; // Access the one-to-one relationship
+
+            if ($customer) {
+                return response()->json([
+                    'message' => 'Your customer profile retrieved successfully',
+                    'customers' => [$customer]
+                ], 200);
+            }
+
+            // No customer profile found for the regular authenticated user.
+            return response()->json([
+                'message' => 'No customer profile found for the authenticated user',
+                'customers' => []
+            ], 200);
+        }
     }
 
     /**
@@ -37,8 +67,9 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
-        if (Auth::user() && Auth::user()->id !== $customer->user_id) {
-            abort(403, 'Unauthorized action. You can only view your own profile' ); // Returns 403 Forbidden
+        $user = Auth::user();
+        if ($user && ($user->role !== 'admin' && $user->id !== $customer->user_id)) {
+            abort(403, 'Unauthorized action. You can only view your own customer profile.' ); // Returns 403 Forbidden
         }
         return response()->json([
             'message' => 'Customer profile retrieved successfully',
@@ -61,9 +92,23 @@ class CustomerController extends Controller
 
     /**
      * Remove the specified resource from storage.
+     * Authenticated User: Can only delete their own customer profile.
+     * Admin User: Can delete any customer profile
+     * 
+     * @param \App\Models\Customer $customer
+     * @return \Illuminate\Http\JsonResponse
      */
-    public function destroy(string $id)
+    public function destroy(Customer $customer)
     {
-        //
+        $user = Auth::user();
+
+        if ($user && ($user->role !== 'admin' && $user->id !== $customer->user_id)) {
+            abort (403, 'Unauthorized action. You cannot delete customer profile.');
+        }
+        $customer->delete();
+        return response()->json([
+            'message' => 'Customer profile deleted successfully.'
+        ], 200);
+
     }
 }

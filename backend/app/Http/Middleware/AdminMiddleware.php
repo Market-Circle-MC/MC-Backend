@@ -28,6 +28,6 @@ class AdminMiddleware
         }
 
         // User is authenticated but not an admin
-        return response()->json(['message' => 'Unauthorized - Requires admin access'], 403);
+        return response()->json(['message' => 'Unauthorized. Admin access required.'], 403);
     }
 }

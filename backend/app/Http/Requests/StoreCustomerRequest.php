@@ -85,7 +85,7 @@ class StoreCustomerRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:255',
-                'regex:/^(\+233|0)[2|5]\d{8}$/'
+                'regex:/^\+\d{7,15}$/'
             ],
         ];
     } /**

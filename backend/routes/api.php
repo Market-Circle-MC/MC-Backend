@@ -35,16 +35,19 @@ Route::post('/customers', [CustomerController::class, 'store']);
 
 Route::put('/customers/{customer}', [CustomerController::class, 'update']);
 
-Route::get('/customers/{customer}', [CustomerController::class, 'show']);
-});
+Route::get('/customers', [CustomerController::class, 'index']);
 
+Route::get('/customers/{customer}', [CustomerController::class, 'show']);
+
+Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+});
 
 
 // Admin routes (require admin role) and API token
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Admin dashboard route
     Route::get('/admin/dashboard', function () {
-        return response()->json(['message' => 'Welcome to the admin dashboard!']);
+        return response()->json(['message' => 'Welcome to the Admin Dashboard!'], 200);
     });
 
     // Category Management Routes (Admin Only)
