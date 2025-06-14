@@ -11,51 +11,47 @@ Route::get('/test', function () {
     return response()->json(['message' => 'API is working!']);
 });
 
+// --- Publicly Accessible Routes (No Authentication Required) ---
 
-// Public routes for authentication
-
+// Public Authentication Routes
 Route::post('/register', [AuthController::class, 'register']);
-
 Route::post('/login', [AuthController::class, 'login']);
 
+// Public Product Routes (Anyone can view products)
+Route::get('products', [ProductController::class, 'index']);
+Route::get('products/{product}', [ProductController::class, 'show']);
 
-// Protected routes (require API token)
+// Public Category Routes (Anyone can view categories)
+Route::get('categories', [CategoryController::class, 'index']);
+Route::get('categories/{category}', [CategoryController::class, 'show']);
 
+
+// --- Protected Routes (Require API Token) ---
 Route::middleware('auth:sanctum')->group(function () {
-
     Route::get('/user', function (Request $request) {
-
         return $request->user();
- });
+    });
+    Route::post('/logout', [AuthController::class, 'logout']);
 
-Route::post('/logout', [AuthController::class, 'logout']);
-
-// Customer profile management routes
-Route::post('/customers', [CustomerController::class, 'store']);
-
-Route::put('/customers/{customer}', [CustomerController::class, 'update']);
-
-Route::get('/customers', [CustomerController::class, 'index']);
-
-Route::get('/customers/{customer}', [CustomerController::class, 'show']);
-
-Route::delete('/customers/{customer}', [CustomerController::class, 'destroy']);
+    // Customer profile management routes
+    // (Authorization logic for who can store/update/view which profile should be in CustomerController/Request)
+    Route::apiResource('customers', CustomerController::class); // Assumes CustomerController handles internal auth
 });
 
 
-// Admin routes (require admin role) and API token
+// --- Admin Routes (Require Admin Role AND API Token) ---
 Route::middleware(['auth:sanctum', 'admin'])->group(function () {
     // Admin dashboard route
     Route::get('/admin/dashboard', function () {
         return response()->json(['message' => 'Welcome to the Admin Dashboard!'], 200);
     });
 
-    // Category Management Routes (Admin Only)
-    Route::apiResource('categories', CategoryController::class);
+    // Category Management Routes (Admin Only for CUD operations)
+    // 'index' and 'show' are now handled by the public routes above.
+    Route::apiResource('categories', CategoryController::class)->except(['index', 'show']);
 
-    // Product Management Routes (Admin Only)
-    Route::apiResource('products', ProductController::class);
+    // Product Management Routes (Admin Only for CUD operations)
+    // 'index' and 'show' are now handled by the public routes above.
+    Route::apiResource('products', ProductController::class)->except(['index', 'show']);
 
-    // Add more admin-specific routes as needed
-    
 });
