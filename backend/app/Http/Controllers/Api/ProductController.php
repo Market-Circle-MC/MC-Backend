@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use App\Models\Product;
+use App\Http\Requests\StoreProductRequest; 
+use App\Http\Requests\UpdateProductRequest;
 use App\Models\ProductImage;
 use App\Models\Category;
 use Illuminate\Http\Request;
@@ -37,29 +39,9 @@ class ProductController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreProductRequest $request)
     {
-        $validatedData = $request->validate([
-            'category_id' => [
-                'required',
-                'integer',
-                Rule::exists('categories', 'id')->where(function ($query) {
-                    $query->where('is_active', true); // Ensure category is active
-                }),
-            ],
-            'name' => 'required|string|max:255|unique:products,name',
-            'short_description' => 'nullable|string|max:500',
-            'description' => 'nullable|string',
-            'price_per_unit' => 'required|numeric|min:0.01',
-            'unit_of_measure' => 'required|string|max:50', // e.g., 'kg', 'piece'
-            'min_order_quantity' => 'required|numeric|min:0.01',
-            'stock_quantity' => 'required|numeric|min:0',
-            'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Validate each image URL
-            'is_featured' => 'boolean',
-            'is_active' => 'boolean',
-            'sku' => 'nullable|string|max:100|unique:products,sku', // will be generated automatically if not set
-        ]);
+        $validatedData = $request->validated();
 
         //Generate SKU if not provided
         if (empty($validatedData['sku'])) {
@@ -73,7 +55,6 @@ class ProductController extends Controller
                 $initials = Str::upper(substr(Str::slug($productName), 0, 3)); // Use first 3 letters of slug if no initials
             }
             $baseSku = $initials;
-            $uniqueSku = '';
             $counter = 0;
 
             do {
@@ -145,39 +126,9 @@ class ProductController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Product $product)
+    public function update(UpdateProductRequest $request, Product $product)
     {
-        $validatedData = $request->validate([
-            'category_id' => [
-                'nullable', // Category can be updated, but not required if not changing
-                'integer',
-                Rule::exists('categories', 'id')->where(function ($query) {
-                    $query->where('is_active', true); // Ensure category is active
-                }),
-            ],
-            'name' => [
-                'nullable', // Name is not required for update unless it's changed
-                'string',
-                'max:255',
-                Rule::unique('products')->ignore($product->id), // Ignore current product's name
-            ],
-            'short_description' => 'nullable|string|max:500',
-            'description' => 'nullable|string',
-            'price_per_unit' => 'nullable|numeric|min:0.01',
-            'unit_of_measure' => 'nullable|string|max:50',
-            'min_order_quantity' => 'nullable|numeric|min:0.01',
-            'stock_quantity' => 'nullable|numeric|min:0',
-            'images' => 'nullable|array',
-            'images.*' => 'image|mimes:jpeg,png,jpg,gif,svg|max:2048', // Validate each image URL
-            'is_featured' => 'boolean',
-            'is_active' => 'boolean',
-            'sku' => [
-                'nullable',
-                'string',
-                'max:100',
-                Rule::unique('products')->ignore($product->id), // Ignore current product's SKU
-            ],
-        ]);
+        $validatedData = $request->validated();
 
         // Regenerate slug only if name has changed and is provided in the request
         if (isset($validatedData['name']) && $validatedData['name'] !== $product->name) {
@@ -185,8 +136,8 @@ class ProductController extends Controller
         }
 
         
-        Log::info('Product Update Validated Data: ' . json_encode($validatedData));
-        Log::info('Product Data BEFORE UPDATE: ' . json_encode($product->toArray()));
+        //Log::info('Product Update Validated Data: ' . json_encode($validatedData));
+        //Log::info('Product Data BEFORE UPDATE: ' . json_encode($product->toArray()));
 
         
         try {
@@ -224,29 +175,39 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        // Add any business logic here before deleting, e.g.,
-        // Prevent deletion if product is part of existing orders.
-        // For now, assuming direct deletion is fine.
-
         try {
-            // Delete associated image files from storage
+            // Delete associated image files from storage AND their database records
             foreach ($product->images as $image) {
-                if (Storage::disk('public')->exists($image->image_url)) {
-                    Storage::disk('public')->delete($image->image_url);
+                // IMPORTANT FIX: Extract the relative path from the full URL
+                // The Storage::url('') part gets the base URL prefix (e.g., 'http://localhost/storage')
+                // We replace that with an empty string to get just the 'products/hash.jpg' part.
+                $relativePath = str_replace(Storage::url(''), '', $image->image_url);
+
+                Log::info("Attempting to delete image file: " . $relativePath); // Log for debugging
+
+                if (Storage::disk('public')->exists($relativePath)) {
+                    Storage::disk('public')->delete($relativePath);
+                    Log::info("Successfully deleted file: " . $relativePath);
+                } else {
+                    Log::warning("File not found on disk, skipping deletion: " . $relativePath);
+                }
+
+                $image->delete(); // Delete the image record from the database
+                Log::info("Deleted image record from database: " . $image->id);
             }
-            $image->delete(); // Delete the image record from the database
-            }
-            $product->delete();
+            
+            $product->delete(); // Delete the product itself
+            Log::info("Product deleted successfully: " . $product->id);
 
             return response()->json([
                 'message' => 'Product deleted successfully.',
-            ], 200); // Or 204 No Content
+            ], 200); 
         } catch (\Exception $e) {
+            Log::error('Failed to delete product. Error: ' . $e->getMessage(), ['exception' => $e, 'product_id' => $product->id]);
             return response()->json([
                 'message' => 'Failed to delete product.',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
-
 }
