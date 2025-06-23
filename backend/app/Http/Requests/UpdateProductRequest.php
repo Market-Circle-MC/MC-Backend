@@ -45,6 +45,10 @@ class UpdateProductRequest extends FormRequest
             'short_description' => 'nullable|string|max:500',
             'description' => 'nullable|string',
             'price_per_unit' => 'nullable|numeric|min:0.01',
+            'discount_price' => 'nullable|numeric|min:0.01|lt:price_per_unit|different:price_per_unit|prohibits:discount_percentage',
+            'discount_percentage' => 'nullable|numeric|min:0|max:100|prohibits:discount_price',
+            'discount_start_date' => 'nullable|date_format:Y-m-d H:i:s',
+            'discount_end_date' => 'nullable|date_format:Y-m-d H:i:s|after_or_equal:discount_start_date',
             'unit_of_measure' => 'nullable|string|max:50',
             'min_order_quantity' => 'nullable|numeric|min:0.01',
             'stock_quantity' => 'nullable|numeric|min:0',
@@ -79,6 +83,11 @@ class UpdateProductRequest extends FormRequest
             'images.*.mimes' => 'Images must be a file of type: jpeg, png, jpg, gif, svg.',
             'images.*.max' => 'Each image may not be greater than 2MB.',
             'sku.unique' => 'This SKU is already in use by another product.',
+            'discount_percentage.prohibits' => 'Cannot provide both a discount percentage and a fixed discount price.',
+            'discount_price.prohibits' => 'Cannot provide both a fixed discount price and a discount percentage.',
+            'discount_price.lt' => 'The discount price must be less than the price per unit.',
+            'discount_price.different' => 'The discount price must be different from the price per unit.',
+            'discount_end_date.after_or_equal' => 'The discount end date must be after or equal to the discount start date.',
         ];
     }
 }
