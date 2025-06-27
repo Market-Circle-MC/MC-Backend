@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class User extends Authenticatable
 {
@@ -53,8 +54,16 @@ class User extends Authenticatable
     /**
      * Get the customer profile associated with the user.
      */
-    public function customer()
+    public function customer(): HasOne
     {
         return $this->hasOne(Customer::class);
+    }
+
+    /**
+     * Get the carts associated with the user.
+     */
+    public function cart(): HasOne
+    {
+    return $this->hasOne(Cart::class);
     }
 }
