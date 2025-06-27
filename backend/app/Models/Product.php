@@ -6,8 +6,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Models\ProductImage;
 use App\Models\Category;
-use Illuminate\Support\Carbon;
+use App\Models\CartItem;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Log;
+
+
 
 class Product extends Model
 {
@@ -50,10 +56,10 @@ class Product extends Model
      * @var array<string, string>
      */
     protected $casts = [
-        'price_per_unit' => 'decimal:2', // Cast to decimal with 2 places
-        'discount_price' => 'decimal:2', // Cast to decimal with 2 places
-        'min_order_quantity' => 'decimal:2', // Cast to decimal with 2 places
-        'stock_quantity' => 'decimal:2', // Cast to decimal with 2 places
+        'price_per_unit' => 'decimal:2', 
+        'discount_price' => 'decimal:2', 
+        'min_order_quantity' => 'decimal:2', 
+        'stock_quantity' => 'decimal:2', 
         'is_featured' => 'boolean',
         'is_active' => 'boolean',
         'discount_start_date' => 'datetime',
@@ -61,10 +67,10 @@ class Product extends Model
     ];
 
     protected $appends = [
-        'main_image_url', // Add the accessor for main image URL
-        'current_price', // Add the accessor for current price
-        'is_discounted', // Add the accessor to check if the product is discounted
-        'discount_status', // Add the accessor for discount status
+        'main_image_url', 
+        'current_price', 
+        'is_discounted',
+        'discount_status', 
     ];
 
     // Boot method to register model events
@@ -117,8 +123,8 @@ class Product extends Model
             }
 
             // 3. Enforce date consistency and nullify discounts if dates are invalid
-            $startDate = $product->discount_start_date;
-            $endDate = $product->discount_end_date;
+             $startDate = $product->discount_start_date ? Carbon::parse($product->discount_start_date) : null;
+            $endDate = $product->discount_end_date ? Carbon::parse($product->discount_end_date) : null;
 
             // If discount_price OR discount_percentage are set (meaning a discount is intended)
             // but dates are missing or invalid, then clear the discounts and dates.
@@ -161,16 +167,16 @@ class Product extends Model
      *
      * @return float
      */
-    public function getCurrentPriceAttribute()
+    public function getCurrentPriceAttribute(): float
     {
         $pricePerUnit = (float) $this->price_per_unit;
 
         // Only apply discount if it's currently active AND valid
         if ($this->isDiscountActive()) {
             if ($this->discount_percentage !== null && $this->discount_percentage > 0 && $this->discount_percentage <= 100) {
-                return round($pricePerUnit * (1 - ((float)$this->discount_percentage / 100)), 2);
+                return round($pricePerUnit * (1 - (float)$this->discount_percentage / 100), 2);
             } elseif ($this->discount_price !== null && $this->discount_price > 0 && $this->discount_price < $pricePerUnit) {
-                return round($this->discount_price, 2);
+                return round($this->attribute['discount_price'], 2);
             }
         }
         return round($pricePerUnit, 2);
@@ -185,7 +191,9 @@ class Product extends Model
     // New: Check if the discount is currently active based on dates and values
     public function isDiscountActive(): bool
     {
+        
         $now = Carbon::now();
+
         $hasValidDiscountValue = ($this->discount_percentage !== null && $this->discount_percentage > 0 && $this->discount_percentage <= 100) ||
                                  ($this->discount_price !== null && $this->discount_price > 0 && $this->discount_price < $this->price_per_unit);
 
@@ -195,8 +203,8 @@ class Product extends Model
 
         // Discount is active if start date is null or in the past/present
         // AND end date is null or in the future/present
-        return ($this->discount_start_date === null || $this->discount_start_date->lessThanOrEqualTo($now)) &&
-               ($this->discount_end_date === null || $this->discount_end_date->greaterThanOrEqualTo($now));
+        return ($this->discount_start_date === null || ($this->discount_start_date instanceof Carbon && $this->discount_start_date->lessThanOrEqualTo($now))) &&
+               ($this->discount_end_date === null || ($this->discount_end_date instanceof Carbon && $this->discount_end_date->greaterThanOrEqualTo($now)));
     }
 
     // New: Accessor for discount status (for user display)
@@ -216,11 +224,11 @@ class Product extends Model
             return 'active';
         }
 
-        if ($this->discount_start_date && $this->discount_start_date->greaterThan($now)) {
+        if ($this->discount_start_date instanceof Carbon && $this->discount_start_date->greaterThan($now)) {
             return 'upcoming';
         }
 
-        if ($this->discount_end_date && $this->discount_end_date->lessThan($now)) {
+        if ($this->discount_end_date instanceof Carbon && $this->discount_end_date->lessThan($now)) {
             return 'expired';
         }
 
@@ -230,7 +238,7 @@ class Product extends Model
     /**
      * Get the category that owns the product.
      */
-    public function category()
+    public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
     }
@@ -238,10 +246,18 @@ class Product extends Model
      /**
      * Get the main image for the product.
      */
-    public function images()
+    public function images(): HasMany
     {
         return $this->hasMany(ProductImage::class);
     }
+
+    /**
+     * Get the cart items associated with this product.
+     */
+    public function cartItems(): HasMany
+    {
+    return $this->hasMany(CartItem::class);
+    }   
 
     /**
      * Scope a query to only include active products.
