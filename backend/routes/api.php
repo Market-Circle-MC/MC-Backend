@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ProductController;
 use App\Http\Controllers\Api\CustomerController;
+use App\Http\Controllers\Api\CartController;
 
 Route::get('/test', function () {
     return response()->json(['message' => 'API is working!']);
@@ -25,7 +26,16 @@ Route::get('products/{product}', [ProductController::class, 'show']);
 Route::get('categories', [CategoryController::class, 'index']);
 Route::get('categories/{category}', [CategoryController::class, 'show']);
 
+// Cart Routes (Authenticated & Guest Accessible)
+// These routes handle logic for both logged-in users and guests
+Route::prefix('cart')->group(function () {
+    Route::get('/', [CartController::class, 'index']); // Get user's or guest's cart
+    Route::post('/add', [CartController::class, 'store']); // Add item to cart
+    Route::put('/update-item/{item}', [CartController::class, 'update']); // Update quantity of specific item
+    Route::delete('/remove-item/{item}', [CartController::class, 'destroy']); // Remove specific item
+    Route::post('/clear', [CartController::class, 'clear']); // Clear all items from cart
 
+});
 // --- Protected Routes (Require API Token) ---
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', function (Request $request) {
