@@ -10,6 +10,7 @@ use Illuminate\Validation\ValidationException;
 use App\Models\User;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * AuthController handles user authentication.
@@ -22,24 +23,16 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request)
     {
-        $loginIdentifier = null;
-        if ($request->has('email')) {
-            $loginIdentifier = 'email';
-        } elseif ($request->has('phone_number')) {
-            $loginIdentifier = 'phone_number';
-        } else {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Either email or phone number is required for registration.'
-            ], 422);
-        }
+        // Removed the $loginIdentifier logic here.
+        // The RegisterRequest validation should ensure that either email,
+        // phone_number, or both are present and valid as per your rules.
 
         $user = User::create([
-            'name' => $request->name,
-            'password' => Hash::make($request->password),
-            'role' => $request->input('role', 'customer'),
-            'email' => $loginIdentifier === 'email' ? $request->email : null,
-            'phone_number' => $loginIdentifier === 'phone_number' ? $request->phone_number : null,
+            'name' => $request->input('name'), // Use input() for safety and consistency
+            'password' => Hash::make($request->input('password')),
+            'role' => $request->input('role', 'customer'), // 'customer' as default if not provided
+            'email' => $request->input('email'), // Directly use email from request
+            'phone_number' => $request->input('phone_number'), // Directly use phone_number from request
         ]);
 
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -47,6 +40,7 @@ class AuthController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'User registered successfully',
+            // Ensure phone_number is included in the returned user data
             'user' => $user->only('id', 'name', 'email', 'phone_number', 'role'),
             'token' => $token,
         ], 201);
@@ -59,12 +53,12 @@ class AuthController extends Controller
     public function login(LoginRequest $request)
     {
         $credentials = $request->only('password');
+        // FIX: Directly use email or phone_number if present in the request for credentials
         if ($request->has('email')) {
             $credentials['email'] = $request->input('email');
         } elseif ($request->has('phone_number')) {
             $credentials['phone_number'] = $request->input('phone_number');
         } else {
-
             return response()->json([
                 'status' => 'error',
                 'message' => 'Either email or phone number is required for login.'
@@ -80,16 +74,19 @@ class AuthController extends Controller
         }
 
         // If authentication is successful
+        /** @var \App\Models\User $user **/
         $user = Auth::user();
 
-        $user->tokens()->delete();
+        
+        $user->tokens()->delete(); // This deletes ALL tokens for the user
 
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([
             'status' => 'success',
             'message' => 'Login successful',
-            'user' => $user,
+            // Return 'phone_number' here as well, so frontend can receive it
+            'user' => $user->only('id', 'name', 'email', 'phone_number', 'role'), 
             'token' => $token
         ], 200);
     }
@@ -102,7 +99,9 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->tokens()->delete();
+        $request->user()->currentAccessToken()->delete(); // Delete only the current token
+        // Or to delete all tokens for the user:
+        // $request->user()->tokens()->delete();
         return response()->json([
             'message' => 'User logged out successfully'
         ]);
@@ -120,8 +119,8 @@ class AuthController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'User details retrieved successfully',
-            'user' =>
-            $request->user()->only('id', 'name', 'email', 'phone_number', 'role')
+            // Return 'phone_number' here. Also 'created_at' if frontend uses 'joinedDate' directly.
+            'user' => $request->user()->only('id', 'name', 'email', 'phone_number', 'role', 'created_at')
         ], 200);
     }
 }
