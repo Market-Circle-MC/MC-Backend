@@ -39,7 +39,6 @@ class LoginRequest extends FormRequest
                 Rule::requiredIf(fn () => !$this->has('email')),
                 'string',
                 'max:255', // Adjust max length as appropriate for phone numbers
-                'regex:/^\+?\d{8,15}$/', // Example regex for international phone numbers (adjust as needed)
             ],
         ];
     }

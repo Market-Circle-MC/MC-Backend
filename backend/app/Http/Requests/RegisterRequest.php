@@ -42,7 +42,6 @@ class RegisterRequest extends FormRequest
                 'required_without:email',
                 'string',
                 'max:255',
-                'regex:/^\+\d{7,15}$/',
                 'unique:users', 
             ],
         ];
