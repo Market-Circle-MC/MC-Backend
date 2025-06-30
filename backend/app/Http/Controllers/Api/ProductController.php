@@ -12,6 +12,7 @@ use App\Models\ProductImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 
 
@@ -29,9 +30,9 @@ class ProductController extends Controller
         $productsQuery = Product::active();
 
         // --- Category Filtering Logic ---
-        Log::info('Checking for "category" query parameter.');
-        Log::info('Request has "category" parameter: ' . ($request->has('category') ? 'true' : 'false'));
-        Log::info('Value of "category" parameter: ' . $request->query('category', 'Not provided'));
+        //Log::info('Checking for "category" query parameter.');
+        //Log::info('Request has "category" parameter: ' . ($request->has('category') ? 'true' : 'false'));
+        //Log::info('Value of "category" parameter: ' . $request->query('category', 'Not provided'));
 
         if ($request->has('category')) {
             $categorySlug = $request->query('category');
@@ -41,20 +42,20 @@ class ProductController extends Controller
 
             // Log what $category contains after the lookup
             if ($category) {
-                Log::info('$category found: ID ' . $category->id . ', Name: ' . $category->name . ', Slug: ' . $category->slug);
+                //Log::info('$category found: ID ' . $category->id . ', Name: ' . $category->name . ', Slug: ' . $category->slug);
             } else {
-                Log::info('$category NOT found for slug: ' . $categorySlug);
+                //Log::info('$category NOT found for slug: ' . $categorySlug);
             }
 
             if ($category) {
-                Log::info('Calling descendantsAndSelf() on Category instance. Category ID: ' . $category->id);
-                // THIS IS THE LINE WHERE THE ERROR OCCURS, SO WE LOG BEFORE AND AFTER
+                //Log::info('Calling descendantsAndSelf() on Category instance. Category ID: ' . $category->id);
+                
                 $categoryIds = Category::descendantsAndSelf($category->id)->pluck('id')->toArray();
-                Log::info('descendantsAndSelf() returned IDs: ' . json_encode($categoryIds));
+                //Log::info('descendantsAndSelf() returned IDs: ' . json_encode($categoryIds));
 
                 $productsQuery->whereIn('category_id', $categoryIds);
             } else {
-                Log::info('Category not found for filtering.');
+                //Log::info('Category not found for filtering.');
                 // If the category slug does not exist, return an empty paginated result.
                 return response()->json([
                     'message' => 'No products found for the specified category.',
@@ -70,7 +71,7 @@ class ProductController extends Controller
 
         $products = $productsQuery->with('category', 'images')->paginate($perPage);
 
-        Log::info('Products query completed. Returning response.');
+        //Log::info('Products query completed. Returning response.');
 
         return response()->json([
             'message' => 'Products retrieved successfully.',
