@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Log;
 use App\Models\Product;
+use App\Models\Category;
 use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\ProductImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+
 
 
 class ProductController extends Controller
@@ -20,18 +22,62 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $perPage = $request->input('per_page', 15); // Default to 15 items per page
-        $products = Product::active() // Only active products
-                            // ->featured() // Optional: Only featured products (remove this line if not needed for this endpoint)
-                            // ->inStock()  // Optional: Only in-stock products
-                            ->with('category', 'images') // Eager load relationships
-                            ->paginate($perPage);
+        Log::info('ProductController@index method started.'); // This will always be logged
+
+        $perPage = $request->input('per_page', 15);
+
+        $productsQuery = Product::active();
+
+        // --- Category Filtering Logic ---
+        Log::info('Checking for "category" query parameter.');
+        Log::info('Request has "category" parameter: ' . ($request->has('category') ? 'true' : 'false'));
+        Log::info('Value of "category" parameter: ' . $request->query('category', 'Not provided'));
+
+        if ($request->has('category')) {
+            $categorySlug = $request->query('category');
+
+            Log::info('Attempting to find category with slug: ' . $categorySlug);
+            $category = Category::where('slug', $categorySlug)->first();
+
+            // Log what $category contains after the lookup
+            if ($category) {
+                Log::info('$category found: ID ' . $category->id . ', Name: ' . $category->name . ', Slug: ' . $category->slug);
+            } else {
+                Log::info('$category NOT found for slug: ' . $categorySlug);
+            }
+
+            if ($category) {
+                Log::info('Calling descendantsAndSelf() on Category instance. Category ID: ' . $category->id);
+                // THIS IS THE LINE WHERE THE ERROR OCCURS, SO WE LOG BEFORE AND AFTER
+                $categoryIds = Category::descendantsAndSelf($category->id)->pluck('id')->toArray();
+                Log::info('descendantsAndSelf() returned IDs: ' . json_encode($categoryIds));
+
+                $productsQuery->whereIn('category_id', $categoryIds);
+            } else {
+                Log::info('Category not found for filtering.');
+                // If the category slug does not exist, return an empty paginated result.
+                return response()->json([
+                    'message' => 'No products found for the specified category.',
+                    'data' => (new LengthAwarePaginator([], 0, $perPage))->toArray()
+                ], 200);
+            }
+        }
+        // --- End Category Filtering Logic ---
+
+        // Optional filters
+        $productsQuery->featured();
+        $productsQuery->inStock();
+
+        $products = $productsQuery->with('category', 'images')->paginate($perPage);
+
+        Log::info('Products query completed. Returning response.');
 
         return response()->json([
             'message' => 'Products retrieved successfully.',
-            'data' => $products
+            'data' => $products->toArray()
         ], 200);
     }
+
 
     /**
      * Store a newly created resource in storage.
