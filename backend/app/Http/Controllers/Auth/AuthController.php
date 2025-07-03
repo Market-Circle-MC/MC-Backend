@@ -23,9 +23,6 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request)
     {
-        // Removed the $loginIdentifier logic here.
-        // The RegisterRequest validation should ensure that either email,
-        // phone_number, or both are present and valid as per your rules.
 
         $user = User::create([
             'name' => $request->input('name'), // Use input() for safety and consistency
@@ -99,9 +96,9 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete(); // Delete only the current token
+        //$request->user()->currentAccessToken()->delete(); // Delete only the current token
         // Or to delete all tokens for the user:
-        // $request->user()->tokens()->delete();
+        $request->user()->tokens()->delete();
         return response()->json([
             'message' => 'User logged out successfully'
         ]);
