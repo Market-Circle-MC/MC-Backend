@@ -10,6 +10,7 @@ use App\Http\Requests\StoreProductRequest;
 use App\Http\Requests\UpdateProductRequest;
 use App\Models\ProductImage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -21,42 +22,74 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+public function index(Request $request)
     {
-        Log::info('ProductController@index method started.'); // This will always be logged
+        $user = Auth::user();
+        $productsQuery = Product::active(); // Default for regular users
+
+        if ($user && $user->role === 'admin') {
+            // Admins can see all products, including inactive ones
+            $productsQuery = Product::query();
+        }
+
+        // Eager load relationships ONCE
+        $productsQuery->with(['category', 'images']);
+
+        Log::info('Product query SQL before pagination:', [
+            'sql' => $productsQuery->toSql(),
+            'bindings' => $productsQuery->getBindings()
+        ]);
+
+        $rawProductsBeforePagination = $productsQuery->get();
+        Log::info('Count of raw products fetched before pagination:', ['count' => $rawProductsBeforePagination->count()]);
 
         $perPage = $request->input('per_page', 15);
-
-        $productsQuery = Product::active();
-
+        Log::info('Request has category parameter:', ['has_category' => $request->has('category')]);
         // --- Category Filtering Logic ---
-        //Log::info('Checking for "category" query parameter.');
-        //Log::info('Request has "category" parameter: ' . ($request->has('category') ? 'true' : 'false'));
-        //Log::info('Value of "category" parameter: ' . $request->query('category', 'Not provided'));
-
         if ($request->has('category')) {
             $categorySlug = $request->query('category');
-
-            Log::info('Attempting to find category with slug: ' . $categorySlug);
-            $category = Category::where('slug', $categorySlug)->first();
-
-            // Log what $category contains after the lookup
-            if ($category) {
-                //Log::info('$category found: ID ' . $category->id . ', Name: ' . $category->name . ', Slug: ' . $category->slug);
-            } else {
-                //Log::info('$category NOT found for slug: ' . $categorySlug);
+            Log::info('Category slug from request:', ['slug' => $categorySlug]);
+            $categoryBaseQuery = Category::query();
+            if (!($user && $user->role === 'admin')) {
+                $categoryBaseQuery->active();
             }
 
-            if ($category) {
-                //Log::info('Calling descendantsAndSelf() on Category instance. Category ID: ' . $category->id);
-                
-                $categoryIds = Category::descendantsAndSelf($category->id)->pluck('id')->toArray();
-                //Log::info('descendantsAndSelf() returned IDs: ' . json_encode($categoryIds));
+            $category = $categoryBaseQuery->where('slug', $categorySlug)->first();
+            Log::info('Found Category object:', ['category' => $category ? $category->toArray() : 'null']);
 
-                $productsQuery->whereIn('category_id', $categoryIds);
+            if ($category) {
+                $relatedCategories = Category::descendantsAndSelf($category->id);
+                Log::info('Related Categories (descendantsAndSelf):', [
+                    'count' => $relatedCategories->count(),
+                    'ids' => $relatedCategories->pluck('id')->toArray(),
+                    'raw_data' => $relatedCategories->toArray()
+                ]);
+
+                $categoryIds = [];
+                if ($user && $user->role === 'admin') {
+                    $categoryIds = $relatedCategories->pluck('id')->toArray();
+                } else {
+                    $categoryIds = $relatedCategories->filter(function ($cat) {
+                        return $cat->is_active;
+                    })->pluck('id')->toArray();
+                }
+
+                Log::info('Final Category IDs for Product Filtering:', ['category_ids' => $categoryIds]);
+
+                if (!empty($categoryIds)) {
+                    $productsQuery->whereIn('category_id', $categoryIds);
+                    Log::info('Applied whereIn to productsQuery.', ['category_ids_used' => $categoryIds]);
+                } else {
+                    // This block means category was found, but no active descendants/self were.
+                    Log::warning('No active category IDs found for product filtering, returning empty response.');
+                    return response()->json([
+                        'message' => 'No products found for the specified category or its active subcategories.',
+                        'data' => (new LengthAwarePaginator([], 0, $perPage))->toArray()
+                    ], 200);
+                }
             } else {
-                //Log::info('Category not found for filtering.');
-                // If the category slug does not exist, return an empty paginated result.
+                // This block means the category with the given slug was NOT found.
+                Log::warning('Category not found for slug: ' . $categorySlug);
                 return response()->json([
                     'message' => 'No products found for the specified category.',
                     'data' => (new LengthAwarePaginator([], 0, $perPage))->toArray()
@@ -65,19 +98,31 @@ class ProductController extends Controller
         }
         // --- End Category Filtering Logic ---
 
-        // Optional filters
+        // Apply optional filters - ensure test data matches these if they are always applied
         $productsQuery->featured();
         $productsQuery->inStock();
 
-        $products = $productsQuery->with('category', 'images')->paginate($perPage);
+        Log::info('Final Product query SQL before pagination:', [
+            'sql' => $productsQuery->toSql(),
+            'bindings' => $productsQuery->getBindings()
+        ]);
+        $productsQuery->orderBy('id', 'desc');
 
-        //Log::info('Products query completed. Returning response.');
+        $products = $productsQuery->paginate($perPage);
+
+        Log::info('Products retrieved for response:', [
+            'count_on_page' => $products->count(),
+            'total_items' => $products->total(),
+            'per_page_setting' => $products->perPage(),
+            'current_page' => $products->currentPage()
+        ]);
 
         return response()->json([
             'message' => 'Products retrieved successfully.',
             'data' => $products->toArray()
         ], 200);
     }
+
 
 
     /**

@@ -8,9 +8,15 @@ use Tests\TestCase;
 use App\Models\User;
 use App\Models\Product;
 use App\Models\Cart;
-use App\Models\CartItem; // <--- THIS WAS MISSING AND IS CRUCIAL!
+use App\Models\CartItem;
 use App\Models\Category;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\Test; // Import the Test attribute
+use PHPUnit\Framework\Attributes\Group; // Import the Group attribute, if you plan to use it later
+use PHPUnit\Framework\Attributes\CoversClass; // Import CoversClass, if you plan to use it later
+use PHPUnit\Framework\Attributes\CoversMethod; // Import CoversMethod, if you plan to use it later
+use PHPUnit\Framework\Attributes\DataProvider; // Import DataProvider, if you plan to use it later
+
 
 class CartApiTest extends TestCase
 {
@@ -57,8 +63,8 @@ class CartApiTest extends TestCase
     /**
      * Set up the test environment before each test method is run.
      * This method MUST be declared before your actual test methods.
-     * @test
      */
+    #[Test]
     protected function setUp(): void
     {
         parent::setUp(); // Always call the parent setUp method first
@@ -113,8 +119,8 @@ class CartApiTest extends TestCase
     /**
      * Test that an authenticated user can retrieve their (initially empty) cart.
      * A new cart should be created for them upon first request.
-     * @test
      */
+    #[Test]
     public function authenticated_user_can_get_their_empty_cart(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -147,8 +153,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user can add a new item to their cart.
-     * @test
      */
+    #[Test]
     public function authenticated_user_can_add_item_to_cart(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -198,8 +204,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that adding an already existing item to the cart updates its quantity.
-     * @test
      */
+    #[Test]
     public function authenticated_user_adding_existing_item_updates_quantity(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -259,8 +265,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user cannot add a product if the quantity exceeds available stock.
-     * @test
      */
+    #[Test]
     public function authenticated_user_cannot_add_item_with_insufficient_stock(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -288,37 +294,37 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user cannot add a product if its stock is zero.
-     * @test
      */
-    public function authenticated_user_cannot_add_item_with_zero_stock(): void
+    #[Test]
+   public function authenticated_user_cannot_add_item_with_zero_stock(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
 
         $response = $this->postJson('/api/cart/add', [
-            'product_id' => $this->product1->id,
-            'quantity' => 100, // Product1 stock is 20
+            'product_id' => $this->productOutOfStock->id, // Use the out of stock product
+            'quantity' => 1, // Requesting 1 item
         ]);
 
         $response->assertStatus(422)
-                 ->assertJsonValidationErrors('quantity')
+                 ->assertJsonValidationErrors('product_id') // <--- CHANGE THIS: Assert on 'product_id' error
                  ->assertJson([
-                    'message' => 'Product is not available or requested quantity is out of stock.',
+                    'message' => 'The selected product does not exist or is not available for purchase.', // <--- CHANGE THIS: Match the actual message
                     'errors' => [
-                        'quantity' => ['The requested quantity exceeds the available stock for this product.'],
+                        'product_id' => ['The selected product does not exist or is not available for purchase.'], // <--- CHANGE THIS: Match the actual error
                     ]
                  ]);
 
         $this->assertDatabaseMissing('cart_items', [
-            'product_id' => $this->product1->id,
-            'cart_id' => Cart::where('user_id', $user->id)->first()?->id, // Use this test's user ID
+            'product_id' => $this->productOutOfStock->id,
+            'cart_id' => Cart::where('user_id', $user->id)->first()?->id,
         ]);
     }
 
 
     /**
      * Test that an authenticated user cannot add a product that does not exist.
-     * @test
      */
+    #[Test]
     public function authenticated_user_cannot_add_non_existent_product(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -340,8 +346,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user can update the quantity of an item in their cart.
-     * @test
      */
+    #[Test]
     public function authenticated_user_can_update_cart_item_quantity(): void
         {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -398,8 +404,7 @@ class CartApiTest extends TestCase
     }
 
     
-
-    /** @test */
+    #[Test]
     public function authenticated_user_cannot_update_cart_item_to_exceed_stock(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -445,8 +450,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user cannot update an item in another user's cart.
-     * @test
      */
+    #[Test]
     public function authenticated_user_cannot_update_other_users_cart_item(): void
     {
         $user = $this->createAuthenticatedUser(); // Authenticate the "current" user for this test
@@ -479,8 +484,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user can remove a specific item from their cart.
-     * @test
      */
+    #[Test]
     public function authenticated_user_can_remove_item_from_cart(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -540,8 +545,8 @@ class CartApiTest extends TestCase
     }
     /**
      * Test that if an authenticated user removes the last item, the cart itself is also deleted.
-     * @test
-     */
+     * */
+    #[Test]
     public function authenticated_user_removing_last_item_also_deletes_cart(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -583,8 +588,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user cannot remove an item from another user's cart.
-     * @test
      */
+    #[Test]
     public function authenticated_user_cannot_remove_other_users_cart_item(): void
     {
         $user = $this->createAuthenticatedUser(); // Authenticate the "current" user for this test
@@ -613,8 +618,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that an authenticated user can clear their entire cart.
-     * @test
      */
+    #[Test]
     public function authenticated_user_can_clear_their_entire_cart(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -663,8 +668,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that clearing a non-existent cart for an authenticated user returns a 404.
-     * @test
      */
+    #[Test]
     public function authenticated_user_clearing_non_existent_cart_returns_404(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -682,8 +687,8 @@ class CartApiTest extends TestCase
     /**
      * Test that adding an item with a quantity less than the product's minimum order quantity
      * for an authenticated user automatically adjusts the quantity to the minimum.
-     * @test
      */
+    #[Test]
     public function authenticated_user_adding_item_with_quantity_less_than_min_order_quantity_adjusts_to_min(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -732,8 +737,8 @@ class CartApiTest extends TestCase
     /**
      * Test that updating an item with a quantity less than the product's minimum order quantity
      * for an authenticated user automatically adjusts the quantity to the minimum.
-     * @test
      */
+    #[Test]
     public function authenticated_user_updating_item_with_quantity_less_than_min_order_quantity_adjusts_to_min(): void
     {
         $user = $this->createAuthenticatedUser(); // Create and authenticate user for this test
@@ -799,8 +804,8 @@ class CartApiTest extends TestCase
     /**
      * Test that a guest user can request their cart and a new one is created,
      * receiving a guest_cart_id in the response.
-     * @test
      */
+    #[Test]
     public function guest_user_can_get_a_new_empty_cart_and_receive_guest_cart_id(): void
     {
         $response = $this->getJson('/api/cart'); // No authentication or guest_cart_id header
@@ -832,8 +837,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user can retrieve their existing cart using the X-Guest-Cart-Id header.
-     *@test
      */
+    #[Test]
     public function guest_user_can_get_their_existing_cart_using_header(): void
     {
         // Manually create a guest cart to simulate an existing one
@@ -858,8 +863,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user can add an item to a new cart and receive the guest_cart_id.
-     * @test
      */
+    #[Test]
     public function guest_user_can_add_item_to_new_cart_and_receive_guest_cart_id(): void
     {
         $response = $this->postJson('/api/cart/add', [ // No header, new cart should be created
@@ -902,8 +907,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user can add an item to an existing cart by providing the guest_cart_id header.
-     * @test
      */
+    #[Test]
     public function guest_user_can_add_item_to_existing_cart_using_header(): void
     {
         // Create an initial guest cart
@@ -950,8 +955,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that adding an existing item in a guest cart updates its quantity.
-     * @test
      */
+    #[Test]
     public function guest_user_adding_existing_item_updates_quantity_in_cart(): void
     {
         // Create guest cart and add an item
@@ -1010,8 +1015,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user can update the quantity of an item in their cart.
-     * @test
      */
+    #[Test]
     public function guest_user_can_update_cart_item_quantity(): void
     {
         // Create guest cart and add item
@@ -1068,8 +1073,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user cannot update a cart item quantity to exceed product stock.
-     * @test
      */
+    #[Test]
     public function guest_user_cannot_update_cart_item_to_exceed_stock(): void
     {
         // Add item with some quantity
@@ -1105,8 +1110,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user can remove a specific item from their cart.
-     * @test
      */
+    #[Test]
     public function guest_user_can_remove_item_from_cart(): void
     {
         // Add multiple items to ensure cart still exists after one is removed
@@ -1158,9 +1163,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that if a guest user removes the last item, the cart itself is also deleted.
-     * 
-     * @test
-     */
+     * */
+    #[Test]
     public function guest_user_removing_last_item_also_deletes_cart(): void
     {
         // Add only one item
@@ -1198,8 +1202,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a guest user can clear their entire cart.
-     * @test
      */
+    #[Test]
     public function guest_user_can_clear_their_entire_cart(): void
     {
         // Add multiple items
@@ -1243,8 +1247,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that clearing a non-existent cart for a guest user returns a 404.
-     * @test
      */
+    #[Test]
     public function guest_user_clearing_non_existent_cart_returns_404(): void
     {
         // Ensure no active cart with this ID exists
@@ -1261,8 +1265,8 @@ class CartApiTest extends TestCase
     /**
      * Test that adding an item with a quantity less than the product's minimum order quantity
      * for a guest user automatically adjusts the quantity to the minimum.
-     * @test
      */
+    #[Test]
     public function guest_user_adding_item_with_quantity_less_than_min_order_quantity_adjusts_to_min(): void
     {
         $guestCart = Cart::create(['user_id' => null, 'status' => 'active']);
@@ -1317,8 +1321,8 @@ class CartApiTest extends TestCase
     /**
      * Test that updating an item with a quantity less than the product's minimum order quantity
      * for a guest user automatically adjusts the quantity to the minimum.
-     * @test
      */
+    #[Test]
     public function guest_user_updating_item_with_quantity_less_than_min_order_quantity_adjusts_to_min(): void
     {
         $guestCart = Cart::create(['user_id' => null, 'status' => 'active']);
@@ -1378,8 +1382,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a non-existent guest cart ID in the header results in a new cart being created for add operations.
-     * @test
      */
+    #[Test]
     public function add_item_with_non_existent_guest_cart_id_creates_new_cart(): void
     {
         $nonExistentCartId = 99999;
@@ -1419,8 +1423,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a non-existent guest cart ID in the header for update operations returns a 404.
-     * @test
      */
+    #[Test]
     public function update_item_with_non_existent_guest_cart_id_returns_404(): void
     {
         $nonExistentCartItemId = 99999; // Assume this cart item does not exist
@@ -1442,8 +1446,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that a non-existent guest cart ID in the header for remove operations returns a 404.
-     * @test
      */
+    #[Test]
     public function remove_item_with_non_existent_guest_cart_id_returns_404(): void
     {
         $nonExistentCartItemId = 99999;
@@ -1462,8 +1466,8 @@ class CartApiTest extends TestCase
 
     /**
      * Test that attempting to modify a guest cart item using a mismatching guest_cart_id in the header returns 403.
-     * @test
      */
+    #[Test]
     public function guest_user_cannot_modify_item_with_mismatching_guest_cart_id(): void
     {
         // Create Cart A and add item

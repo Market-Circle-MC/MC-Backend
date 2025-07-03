@@ -257,7 +257,17 @@ class Product extends Model
     public function cartItems(): HasMany
     {
     return $this->hasMany(CartItem::class);
-    }   
+    } 
+    
+    /**
+     * Get the order items associated with this product.
+     * This is used to retrieve all order items that reference this product.
+     * It allows us to see how many times this product has been ordered, its total sales
+     */
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
 
     /**
      * Scope a query to only include active products.
@@ -290,21 +300,29 @@ class Product extends Model
      */
     public function getMainImageUrlAttribute()
     {
-        // Try to find an image explicitly marked as main
+        // 1. Try to find an image explicitly marked as main
         $mainImage = $this->images->firstWhere('is_main_image', true);
 
-        // If no main image is explicitly set, take the first available image
+        // 2. If no main image is explicitly set, take the first available image
         if (!$mainImage) {
             $mainImage = $this->images->first();
         }
 
-        // If an image is found, return its full public URL
-        if ($mainImage) {
-            return asset('storage/' . $mainImage->image_url);
+        // 3. If an image object was found, determine its correct URL
+        if ($mainImage && $mainImage->image_url) { // Ensure image_url property exists
+            $imageUrl = $mainImage->image_url;
+
+            // Check if the image_url is already a full, absolute URL (like https://picsum.photos/...)
+            if (filter_var($imageUrl, FILTER_VALIDATE_URL)) {
+                return $imageUrl; // It's an external URL, return it directly
+            } else {
+                // It's a relative path (e.g., 'products/my_uploaded_image.jpg')
+                // Prepend the storage path using Laravel's asset helper
+                return asset('storage/' . $imageUrl);
+            }
         }
 
-        // Return null if no images are associated with the product
-        return null; // Or a placeholder URL like asset('images/placeholder.jpg')
+        return 'https://placehold.co/600x400/e0e0e0/000000?text=No+Image';
     }
 
 }

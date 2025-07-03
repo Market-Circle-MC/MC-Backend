@@ -6,9 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Http\Requests\StoreCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
-use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Auth;
+
 
 class CategoryController extends Controller
 {
@@ -17,15 +17,21 @@ class CategoryController extends Controller
      */
     public function index()
     {
-        // Retrieve all active categories, optionally with their parents/children
-        // You might want to paginate this for larger datasets: Category::where('is_active', true)->paginate(10);
-        $categories = Category::where('is_active', true)
-                                ->with(['parent', 'children']) // Eager load parent and children relationships
-                                ->get();
+        $categories = Category::query(); // Start with a query builder instance
+        $user = Auth::user(); // Get the authenticated user
+        // Check if the authenticated user is an admin
+        // This assumes your User model has a 'role' column and you're using 'admin' for admin users.
+        if ($user && $user->role === 'admin') {
+            // Admin users get all categories
+            $categories->with(['parent', 'children']);
+        } else {
+            // Non-admin (guest, customer) users only get active categories
+            $categories->where('is_active', true)->with(['parent', 'children']);
+        }
 
         return response()->json([
             'message' => 'Categories retrieved successfully.',
-            'data' => $categories
+            'data' => $categories->get() // Execute the query
         ], 200);
     }
 
