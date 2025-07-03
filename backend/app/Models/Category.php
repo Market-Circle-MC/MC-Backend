@@ -63,4 +63,12 @@ class Category extends Model
     {
         return $this->hasMany(Product::class);
     }
+
+    /**
+     * Get the active scope for the category. 
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
 }
