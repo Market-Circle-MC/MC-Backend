@@ -40,6 +40,8 @@ RUN composer install --no-dev --optimize-autoloader
 # For more complex/production setups, an entrypoint script or pre-deploy hook is better.
 RUN php artisan migrate --force
 
+RUN apt-get update && apt-get install -y dos2unix
+
 # Copy the custom entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 # Make the entrypoint script executable
@@ -47,6 +49,8 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 RUN ls -la /usr/local/bin/entrypoint.sh
 RUN file /usr/local/bin/entrypoint.sh
+
+RUN dos2unix /entrypoint.sh && apt-get --purge remove -y dos2unix && rm -rf /var/lib/apt/lists/*
 
 # Configure Nginx for Laravel's public directory
 # Ensure backend/docker/nginx/default.conf exists in your repo
