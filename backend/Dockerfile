@@ -60,4 +60,5 @@ COPY docker/supervisor/supervisord.conf /etc/supervisord.conf
 EXPOSE 80
 
 # Command to run Supervisor when the container starts
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
