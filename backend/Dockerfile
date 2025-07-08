@@ -39,7 +39,11 @@ RUN composer install --no-dev --optimize-autoloader
 # IMPORTANT: This assumes your DB is available and simple migrations work at build time.
 # For more complex/production setups, an entrypoint script or pre-deploy hook is better.
 RUN php artisan migrate --force
-RUN php artisan db:seed --force
+
+# Copy the custom entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+# Make the entrypoint script executable
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Configure Nginx for Laravel's public directory
 # Ensure backend/docker/nginx/default.conf exists in your repo
