@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     # Choose your database client and dev libs:
     postgresql-dev \
     # OR for MySQL: mysql-client mysql-dev
-    && docker-php-ext-install pdo_mysql # OR pdo_pgsql for PostgreSQL
+    && docker-php-ext-install pdo_pgsql \
     && docker-php-ext-install zip pcntl gd opcache \
     && rm -rf /var/cache/apk/*
 
