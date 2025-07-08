@@ -1,22 +1,56 @@
-FROM richarvey/nginx-php-fpm:1.7.2
+# Use a stable PHP-FPM image
+# php:8.2-fpm-alpine3.20 is a good stable choice.
+# Or php:8.3-fpm-alpine if you need PHP 8.3 features and it's stable.
+FROM php:8.2-fpm-alpine3.20
 
-COPY . .
+# Install system dependencies and PHP extensions required by Laravel
+RUN apk add --no-cache \
+    nginx \
+    supervisor \
+    curl \
+    unzip \
+    git \
+    build-base \
+    libzip-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    # Choose your database client and dev libs:
+    postgresql-dev \
+    # OR for MySQL: mysql-client mysql-dev
+    && docker-php-ext-install pdo_mysql # OR pdo_pgsql for PostgreSQL
+    && docker-php-ext-install zip pcntl gd opcache \
+    && rm -rf /var/cache/apk/*
 
+# Copy Composer binary from an official Composer image
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
+# Set the working directory for your application inside the container
+WORKDIR /var/www/html
 
-# Image config
-ENV SKIP_COMPOSER 1
-ENV WEBROOT /var/www/html/public
-ENV PHP_ERRORS_STDERR 1
-ENV RUN_SCRIPTS 1
-ENV REAL_IP_HEADER 1
+# Copy your entire Laravel application into the container
+# This MUST happen before composer install, and it uses the build context
+# (which you should set to 'backend/' in Render settings)
+COPY . /var/www/html
 
-# Laravel config
-ENV APP_ENV staging
-ENV APP_DEBUG true
-ENV LOG_CHANNEL stderr
+# Install Composer dependencies -- this creates the 'vendor' directory
+RUN composer install --no-dev --optimize-autoloader
 
-# Allow composer to run as root
-ENV COMPOSER_ALLOW_SUPERUSER 1
+# Run database migrations as part of the build (for free tier workaround)
+# IMPORTANT: This assumes your DB is available and simple migrations work at build time.
+# For more complex/production setups, an entrypoint script or pre-deploy hook is better.
+RUN php artisan migrate --force
+RUN php artisan db:seed --force
 
-CMD ["/start.sh"]
+# Configure Nginx for Laravel's public directory
+# Ensure backend/docker/nginx/default.conf exists in your repo
+COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+
+# Configure Supervisord to manage PHP-FPM and Nginx processes
+# Ensure backend/docker/supervisor/supervisord.conf exists in your repo
+COPY docker/supervisor/supervisord.conf /etc/supervisord.conf
+
+# Expose port 80, as Nginx will listen on this port
+EXPOSE 80
+
+# Command to run Supervisor when the container starts
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
