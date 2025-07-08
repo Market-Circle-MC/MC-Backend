@@ -35,6 +35,10 @@ COPY . /var/www/html
 # Install Composer dependencies -- this creates the 'vendor' directory
 RUN composer install --optimize-autoloader
 
+RUN chown -R www-data:www-data /var/www/html/storage \
+    && chown -R www-data:www-data /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/storage \
+    && chmod -R 775 /var/www/html/bootstrap/cache
 
 RUN apk add --no-cache dos2unix
 
