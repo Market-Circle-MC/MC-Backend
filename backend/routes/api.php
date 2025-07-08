@@ -76,7 +76,6 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Order Management (Customers can create/view their own orders)
-    
     Route::post('orders', [OrderController::class, 'store']); // Create a new order
     Route::get('orders', [OrderController::class, 'index']); // View own orders
     Route::get('orders/{order}', [OrderController::class, 'show']); // View specific order
