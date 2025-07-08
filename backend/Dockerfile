@@ -56,7 +56,6 @@ RUN apk del dos2unix && rm -rf /var/cache/apk/*
 RUN ls -la /usr/local/bin/entrypoint.sh
 RUN file /usr/local/bin/entrypoint.sh
 
-RUN dos2unix /entrypoint.sh && apt-get --purge remove -y dos2unix && rm -rf /var/lib/apt/lists/*
 
 # Configure Nginx for Laravel's public directory
 # Ensure backend/docker/nginx/default.conf exists in your repo
