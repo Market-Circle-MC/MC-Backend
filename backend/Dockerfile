@@ -33,7 +33,7 @@ WORKDIR /var/www/html
 COPY . /var/www/html
 
 # Install Composer dependencies -- this creates the 'vendor' directory
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --optimize-autoloader
 
 # Run database migrations as part of the build (for free tier workaround)
 # IMPORTANT: This assumes your DB is available and simple migrations work at build time.
