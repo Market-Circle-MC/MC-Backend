@@ -4,10 +4,10 @@
 set -e
 
 echo "Running database migrations..."
-php artisan migrate --force
+php artisan migrate:fresh --seed --force
 
-echo "Running post-startup database seeding..."
-php artisan db:seed --force
+echo "Clearing and optimizing Laravel caches..."
+php artisan optimize:clear
 
 echo "Starting Supervisor..."
 # Execute the original CMD command (Supervisor)
