@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\DeliveryOptionController;
 use App\Http\Controllers\Api\AddressController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 
 
 Route::get('/test', function () {
@@ -21,6 +22,12 @@ Route::get('/test', function () {
 // Public Authentication Routes
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// Google Sign-In Routes (Initiation and Callback) - These must be public for the initial redirect flow
+Route::prefix('auth')->group(function () {
+    Route::get('/google/redirect', [GoogleAuthController::class, 'redirectToGoogle'])->name('google.redirect');
+    Route::get('/google/callback', [GoogleAuthController::class, 'handleGoogleCallback'])->name('google.callback');
+});
 
 // Public Product Routes (Anyone can view products)
 Route::get('products', [ProductController::class, 'index']);
@@ -34,50 +41,55 @@ Route::get('categories/{category}', [CategoryController::class, 'show']);
 Route::get('delivery-options', [DeliveryOptionController::class, 'index']);
 Route::get('delivery-options/{deliveryOption}', [DeliveryOptionController::class, 'show']);
 
-
 // Paystack Webhook Route (Public but secured by signature verification)
 Route::post('/paystack/webhook', [OrderController::class, 'handlePaystackWebhook']);
 
 
-// --- Protected Routes (Require API Token) ---
-
+// --- Protected Routes (Require API Token - auth:sanctum middleware) ---
 Route::middleware('auth:sanctum')->group(function () {
+    // User and Logout
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
     Route::post('/logout', [AuthController::class, 'logout']);
 
-    // Customer profile management routes
-    Route::get('customers', [CustomerController::class, 'index']);
-    Route::post('customers', [CustomerController::class, 'store']);
+    // Customer profile management routes (accessible by the authenticated customer)
+    // Note: 'index', 'store', 'destroy' for 'customers' might be more admin-specific
+    // Typically, a customer would 'show' or 'update' their *own* profile.
+    // Consider if 'customers' routes should be for admin only, or if a customer
+    // can only interact with their own record (e.g., /customers/me or using route model binding with current user ID).
+    Route::get('customers', [CustomerController::class, 'index']); // Potentially admin-only
+    Route::post('customers', [CustomerController::class, 'store']); // Potentially admin-only, or for self-registration if not using /register
     Route::get('customers/{customer}', [CustomerController::class, 'show']);
     Route::put('customers/{customer}', [CustomerController::class, 'update']);
-    Route::delete('customers/{customer}', [CustomerController::class, 'destroy']);
-});
+    Route::delete('customers/{customer}', [CustomerController::class, 'destroy']); // Potentially admin-only
 
-// Cart Routes (Authenticated & Guest Accessible)
-// These routes handle logic for both logged-in users and guests
-Route::prefix('cart')->group(function () {
-    Route::get('/', [CartController::class, 'index']); // Get user's or guest's cart
-    Route::post('/add', [CartController::class, 'store']); // Add item to cart
-    Route::put('/update-item/{item}', [CartController::class, 'update']); // Update quantity of specific item
-    Route::delete('/remove-item/{item}', [CartController::class, 'destroy']); // Remove specific item
-    Route::post('/clear', [CartController::class, 'clear']); // Clear all items from cart
+    // Cart Routes (Authenticated User's Cart)
+    // These routes are now explicitly protected. If you need guest cart functionality,
+    // you'll need separate logic in your CartController to handle guest tokens/sessions.
+    Route::prefix('cart')->group(function () {
+        Route::get('/', [CartController::class, 'index']); // Get authenticated user's cart
+        Route::post('/add', [CartController::class, 'store']); // Add item to cart
+        Route::put('/update-item/{item}', [CartController::class, 'update']); // Update quantity of specific item
+        Route::delete('/remove-item/{item}', [CartController::class, 'destroy']); // Remove specific item
+        Route::post('/clear', [CartController::class, 'clear']); // Clear all items from cart
+    });
 
-});
-
-// Order Management (Customers can create/view their own orders)
+    // Order Management (Customers can create/view their own orders)
+    
     Route::post('orders', [OrderController::class, 'store']); // Create a new order
     Route::get('orders', [OrderController::class, 'index']); // View own orders
     Route::get('orders/{order}', [OrderController::class, 'show']); // View specific order
 
-// Address Management (Customer specific)
+    // Address Management (Customer specific)
     Route::get('addresses', [AddressController::class, 'index']);
     Route::post('addresses', [AddressController::class, 'store']);
     Route::get('addresses/{address}', [AddressController::class, 'show']);
     Route::put('addresses/{address}', [AddressController::class, 'update']);
     Route::patch('addresses/{address}', [AddressController::class, 'update']);
     Route::delete('addresses/{address}', [AddressController::class, 'destroy']);
+});
+
 
 // --- Admin Routes (Require Admin Role AND API Token) ---
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
@@ -100,17 +112,17 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::patch('products/{product}', [ProductController::class, 'update']);
     Route::delete('products/{product}', [ProductController::class, 'destroy']);
 
-    // Order Management (Admin-only actions: update, delete, view all)
+    // Order Management (Admin-only actions: view all, update, delete)
+    // These paths are distinct from customer orders due to the '/admin' prefix.
     Route::get('orders', [OrderController::class, 'adminIndex']); // View all orders (Admin)
     Route::get('orders/{order}/details', [OrderController::class, 'adminShow']); // View specific order details (Admin)
-    // Admin can update order status, tracking etc
-    // This is useful for managing orders, updating statuses, etc.
-    Route::put('orders/{order}', [OrderController::class, 'update']); // Update order status, tracking etc.
-    // Note: Using PUT for full updates, PATCH can be used for partial updates if needed
-    Route::patch('orders/{order}', [OrderController::class, 'update']);
-    Route::delete('orders/{order}', [OrderController::class, 'destroy']); // Delete an order
+    Route::put('orders/{order}', [OrderController::class, 'update']); // Admin can update order status, tracking etc.
+    Route::patch('orders/{order}', [OrderController::class, 'update']); // Admin can partially update order
+    Route::delete('orders/{order}', [OrderController::class, 'destroy']); // Admin can delete an order
 
     // Delivery Option Management (Admin only)
+    // Note: 'index' and 'show' for delivery options are also public.
+    // Consider if admin needs a separate 'index'/'show' or if the public ones suffice.
     Route::post('delivery-options', [DeliveryOptionController::class, 'store']);
     Route::get('delivery-options', [DeliveryOptionController::class, 'index']); // Admin can view all delivery options
     Route::get('delivery-options/{deliveryOption}', [DeliveryOptionController::class, 'show']); // Admin can view any delivery option

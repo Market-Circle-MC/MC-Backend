@@ -26,6 +26,8 @@ class User extends Authenticatable
         'password',
         'phone_number',
         'role', 
+        'google_id', // Added for Google authentication
+        'avatar', // Optional: if you want to store user avatars
     ];
 
     /**
