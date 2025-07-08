@@ -45,6 +45,9 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 # Make the entrypoint script executable
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+RUN ls -la /usr/local/bin/entrypoint.sh
+RUN file /usr/local/bin/entrypoint.sh
+
 # Configure Nginx for Laravel's public directory
 # Ensure backend/docker/nginx/default.conf exists in your repo
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
