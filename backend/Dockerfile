@@ -40,7 +40,7 @@ RUN composer install --no-dev --optimize-autoloader
 # For more complex/production setups, an entrypoint script or pre-deploy hook is better.
 RUN php artisan migrate --force
 
-RUN apt-get update && apt-get install -y dos2unix
+RUN sudo apt-get update && sudo apt-get install -y dos2unix
 
 # Copy the custom entrypoint script
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
