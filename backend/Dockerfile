@@ -35,10 +35,6 @@ COPY . /var/www/html
 # Install Composer dependencies -- this creates the 'vendor' directory
 RUN composer install --optimize-autoloader
 
-# Run database migrations as part of the build (for free tier workaround)
-# IMPORTANT: This assumes your DB is available and simple migrations work at build time.
-# For more complex/production setups, an entrypoint script or pre-deploy hook is better.
-RUN php artisan migrate --force
 
 RUN apk add --no-cache dos2unix
 

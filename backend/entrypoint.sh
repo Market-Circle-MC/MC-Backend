@@ -3,6 +3,9 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
+echo "Running database migrations..."
+php artisan migrate --force
+
 echo "Running post-startup database seeding..."
 php artisan db:seed --force
 
