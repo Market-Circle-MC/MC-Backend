@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\DeliveryOptionController;
 use App\Http\Controllers\Api\AddressController;
 use App\Http\Controllers\Auth\GoogleAuthController;
+use App\Http\Controllers\Admin\AdminUserController;
 
 
 Route::get('/test', function () {
@@ -96,6 +97,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
     Route::get('/dashboard', function () {
         return response()->json(['message' => 'Welcome to the Admin Dashboard!'], 200);
     });
+
+    // Admin User Management Routes
+    Route::get('users', [AdminUserController::class, 'index']); // List
 
     // Category Management Routes (Admin Only for CUD operations)
     // 'index' and 'show' are now handled by the public routes above.
