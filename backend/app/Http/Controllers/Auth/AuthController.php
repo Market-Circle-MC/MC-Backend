@@ -120,4 +120,6 @@ class AuthController extends Controller
             'user' => $request->user()->only('id', 'name', 'email', 'phone_number', 'role', 'created_at')
         ], 200);
     }
+    
+
 }

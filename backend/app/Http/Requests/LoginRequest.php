@@ -53,7 +53,7 @@ class LoginRequest extends FormRequest
         return [
             'email.required_without' => 'Either email or phone number is required.',
             'phone_number.required_without' => 'Either phone number or email is required.',
-            'phone_number.regex' => 'The phone number format is invalid.',
+            //'phone_number.regex' => 'The phone number format is invalid.',
         ];
     }
 }
