@@ -29,7 +29,7 @@ class StoreCustomerRequest extends FormRequest
                 'exists:users,id',
                 'unique:customers,user_id',
             ],
-            'customer_type' => [
+            /** 'customer_type' => [
                 'required',
                 'string',
                 // Rule::in ensures the value is one of the specified options
@@ -41,7 +41,7 @@ class StoreCustomerRequest extends FormRequest
                 'max:255',
                 // Conditional Rule: required if 'customer_type' in the request is 'restaurant'
                 Rule::requiredIf($this->customer_type === 'restaurant'),
-            ],
+            ],*/
             'ghanapost_gps_address' => [
                 'nullable',
                 'string',           
@@ -52,7 +52,7 @@ class StoreCustomerRequest extends FormRequest
                 'string',
                 'max:255'
             ],
-            'tax_id' => [
+            /** 'tax_id' => [
                 'nullable',
                 'string',
                 'max:255',
@@ -75,7 +75,7 @@ class StoreCustomerRequest extends FormRequest
                         }
                     }
                 },
-            ],
+            ],*/
             'contact_person_name' => [
                 'nullable',
                 'string',
@@ -84,8 +84,7 @@ class StoreCustomerRequest extends FormRequest
             'contact_person_phone' => [
                 'nullable',
                 'string',
-                'max:255',
-                'regex:/^\+\d{7,15}$/'
+                'max:255'
             ],
         ];
     } /**
@@ -98,9 +97,9 @@ class StoreCustomerRequest extends FormRequest
         return [
             'user_id.unique' => 'A customer profile already exists for the selected user.',
             'user_id.exists' => 'The selected user does not exist.',
-            'customer_type.in' => 'The customer type must be one of: restaurant, family, or individual_bulk.',
+            /*'customer_type.in' => 'The customer type must be one of: restaurant, family, or individual_bulk.',
             'business_name.required_if' => 'The business name is required when the customer type is restaurant.',
-            'tax_id.required_if' => 'The tax ID is required when the customer type is restaurant.',
+            'tax_id.required_if' => 'The tax ID is required when the customer type is restaurant.',*/
         ];
     }
 }

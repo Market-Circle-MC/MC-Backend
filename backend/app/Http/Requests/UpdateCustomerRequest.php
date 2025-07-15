@@ -44,7 +44,7 @@ class UpdateCustomerRequest extends FormRequest
                 // of the customer profile being updated. Prevents changing the linked user.
                 Rule::in([$customer->user_id]),
             ],
-            'customer_type' => [
+            /** 'customer_type' => [
                 'sometimes', // Field is optional for update.
                 'string',
                 // Ensures customer_type is one of the allowed values.
@@ -59,7 +59,7 @@ class UpdateCustomerRequest extends FormRequest
                     $newCustomerType = $this->input('customer_type', $customer->customer_type); // Get new type or fallback to old
                     return $newCustomerType === 'restaurant';
                 }),
-            ],
+            ],*/
             'ghanapost_gps_address' => [
                 'sometimes', // Field is optional for update.
                 'nullable',  // Can be null.
@@ -72,7 +72,7 @@ class UpdateCustomerRequest extends FormRequest
                 'string',
                 'max:255',
             ],
-            'tax_id' => [
+            /** 'tax_id' => [
                 'nullable',  // Can be null.
                 'string',
                 'max:255',
@@ -94,7 +94,7 @@ class UpdateCustomerRequest extends FormRequest
                         }
                     }
                 },
-            ],
+            ],*/
             'contact_person_name' => [
                 'sometimes',
                 'nullable',
@@ -105,8 +105,7 @@ class UpdateCustomerRequest extends FormRequest
                 'sometimes',
                 'nullable',
                 'string',
-                'max:255',
-                'regex:/^\+\d{7,15}$/'
+                'max:255'
             ],
         ];
     }

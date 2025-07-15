@@ -22,11 +22,11 @@ class Customer extends Model
      */
     protected $fillable = [
         'user_id',
-        'customer_type',
-        'business_name',
+        //'customer_type',
+        //'business_name',
         'ghanapost_gps_address',
         'digital_address',
-        'tax_id',
+        //'tax_id',
         'contact_person_name',
         'contact_person_phone',
     ];
