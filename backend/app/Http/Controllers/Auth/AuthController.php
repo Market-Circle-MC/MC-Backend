@@ -112,14 +112,29 @@ class AuthController extends Controller
      */
     public function user(Request $request)
     {
-        // Ensure only specific user data is returned, not sensitive fields like password
+        // Eager load the 'customer' relationship
+        $user = $request->user()->load('customer'); 
+        
+        $userData = [
+            'name' => $user->name,
+            'phone_number' => $user->phone_number,
+            'id' => $user->id, 
+            'email' => $user->email,
+            'role' => $user->role,
+            'created_at' => $user->created_at,
+        ];
+
+        // Conditionally add the customer relationship if it exists
+        if ($user->relationLoaded('customer') && $user->customer) {
+            // Convert the customer model to an array to include all its attributes
+            $userData['customer'] = $user->customer->toArray(); 
+        }
+
         return response()->json([
             'status' => 'success',
             'message' => 'User details retrieved successfully',
-            // Return 'phone_number' here. Also 'created_at' if frontend uses 'joinedDate' directly.
-            'user' => $request->user()->only('id', 'name', 'email', 'phone_number', 'role', 'created_at')
+            'user' => $userData
         ], 200);
     }
     
-
 }
